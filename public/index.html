@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhyClick</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <span class="logo-bracket">[</span>WhyClick<span class="logo-bracket">]</span>
+    </div>
+    <p class="tagline">Inspect any URL before you trust it.</p>
+  </header>
+
+  <main>
+    <div class="input-block">
+      <span class="prompt">$</span>
+      <input
+        id="urlInput"
+        type="text"
+        placeholder="paste a URL here..."
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <button id="analyzeBtn">analyze →</button>
+    </div>
+
+    <div id="output" class="output" aria-live="polite"></div>
+  </main>
+
+  <footer>
+    <span>Security awareness meets URL analysis — understand links before trusting them.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
