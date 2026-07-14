@@ -37,7 +37,7 @@ hello@adamiskandar.com
 Use this exact subject line:
 
 ```
-Subject: [PATCH] opalanet/WhyClick
+[PATCH] opalanet/WhyClick
 ```
 
 And include your committer identity in the body:
