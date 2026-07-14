@@ -40,4 +40,4 @@ npm run dev
 
 ## Contributing
 
-We accept contribution, feel free to fork and open the PR
+Please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
