@@ -49,7 +49,7 @@ From: Your Committer Name
 
 > **Note:** The committer name and email in the body should match how you signed your commit (`git config user.name` / `git config user.email`) — this identifies who authored the change. It does not have to be the same address you are sending from; you can use a different personal or work email to send the message.
 
-### Example
+#### Example
 
 Say your commit was signed as `John Doe <johndoe@example.org>` but you are sending from your personal Gmail:
 
