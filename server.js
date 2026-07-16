@@ -35,8 +35,14 @@ function analyzeURL(rawURL) {
   }
 
   const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Regex.test(hostname)) {
-    findings.push({ severity: "high", label: "IP address hostname", detail: "URLs using raw IPs instead of domain names are a common phishing tactic." });
+  const ipv6Regex = /^\[([0-9a-fA-F:]+)\]$/;
+  if (ipv4Regex.test(hostname) || ipv6Regex.test(hostname)) {
+    const isIPv6 = ipv6Regex.test(hostname);
+    findings.push({
+      severity: "high",
+      label: `IP address hostname (${isIPv6 ? "IPv6" : "IPv4"})`,
+      detail: "URLs using raw IPs instead of domain names are a common phishing tactic.",
+    });
     riskScore += 35;
   }
 
