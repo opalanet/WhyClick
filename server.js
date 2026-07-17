@@ -3,6 +3,9 @@ const fs = require("fs");
 const path = require("path");
 const url = require("url");
 
+const heuristics = JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics.json"), "utf8"));
+const { suspiciousTLDs, shorteners, brands, suspiciousParams } = heuristics;
+
 const PORT = 3000;
 
 function analyzeURL(rawURL) {
@@ -58,20 +61,17 @@ function analyzeURL(rawURL) {
     riskScore += 40;
   }
 
-  const suspiciousTLDs = [".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".click", ".work", ".loan", ".win", ".download", ".racing"];
   const matchedTLD = suspiciousTLDs.find(tld => hostname.endsWith(tld));
   if (matchedTLD) {
     findings.push({ severity: "medium", label: `Suspicious TLD (${matchedTLD})`, detail: "This top-level domain is commonly associated with free/throwaway domains used in phishing campaigns." });
     riskScore += 20;
   }
 
-  const shorteners = ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "adf.ly", "bl.ink", "short.link", "rb.gy", "cutt.ly", "clck.ru"];
   if (shorteners.some(s => hostname === s || hostname.endsWith("." + s))) {
     findings.push({ severity: "medium", label: "URL shortener", detail: "Destination is hidden. The link could redirect anywhere — including malicious sites." });
     riskScore += 25;
   }
 
-  const brands = ["paypal", "google", "apple", "microsoft", "amazon", "facebook", "netflix", "instagram", "twitter", "linkedin", "dropbox", "chase", "wellsfargo", "bankofamerica"];
   const domainWithoutTLD = subdomainParts.slice(0, -1).join(".");
   const impersonatedBrand = brands.find(b => domainWithoutTLD.includes(b) && !hostname.startsWith(b + "."));
   if (impersonatedBrand) {
@@ -84,7 +84,6 @@ function analyzeURL(rawURL) {
     riskScore += 10;
   }
 
-  const suspiciousParams = ["redirect", "url", "next", "return", "returnUrl", "goto", "target", "dest", "destination", "ref", "link"];
   const foundRedirectParam = params.find(([k]) => suspiciousParams.map(p => p.toLowerCase()).includes(k.toLowerCase()));
   if (foundRedirectParam) {
     findings.push({ severity: "medium", label: `Open redirect parameter (?${foundRedirectParam[0]}=)`, detail: "This parameter may redirect you to an unintended destination, bypassing domain trust." });

@@ -1,0 +1,21 @@
+{
+  "suspiciousTLDs": [
+    ".tk", ".ml", ".ga", ".cf", ".gq",
+    ".xyz", ".top", ".click", ".work",
+    ".loan", ".win", ".download", ".racing"
+  ],
+  "shorteners": [
+    "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
+    "is.gd", "buff.ly", "adf.ly", "bl.ink", "short.link",
+    "rb.gy", "cutt.ly", "clck.ru"
+  ],
+  "brands": [
+    "paypal", "google", "apple", "microsoft", "amazon",
+    "facebook", "netflix", "instagram", "twitter", "linkedin",
+    "dropbox", "chase", "wellsfargo", "bankofamerica"
+  ],
+  "suspiciousParams": [
+    "redirect", "url", "next", "return", "returnUrl",
+    "goto", "target", "dest", "destination", "ref", "link"
+  ]
+}
