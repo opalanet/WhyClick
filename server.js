@@ -55,11 +55,19 @@ function analyzeURL(rawURL) {
     riskScore += 20;
   }
 
+  const decodedHostname = url.domainToUnicode(hostname);
+  const isPunycode = decodedHostname !== hostname && decodedHostname !== "";
   const lookalikes = /[^\x00-\x7F]/;
-  if (lookalikes.test(hostname)) {
-    findings.push({ severity: "high", label: "Non-ASCII characters in domain", detail: "Unicode characters can be used to mimic real domains visually (IDN homograph attack)." });
+  if (lookalikes.test(hostname) || isPunycode) {
+    const display = isPunycode ? decodedHostname : hostname;
+    findings.push({
+      severity: "high",
+      label: "Non-ASCII / IDN homograph domain",
+      detail: `Domain decodes to "${display}". Unicode characters can visually mimic real domains (e.g. pаypal.com using a Cyrillic 'а').`,
+    });
     riskScore += 40;
   }
+
 
   const matchedTLD = suspiciousTLDs.find(tld => hostname.endsWith(tld));
   if (matchedTLD) {
@@ -73,7 +81,11 @@ function analyzeURL(rawURL) {
   }
 
   const domainWithoutTLD = subdomainParts.slice(0, -1).join(".");
-  const impersonatedBrand = brands.find(b => domainWithoutTLD.includes(b) && !hostname.startsWith(b + "."));
+  const decodedDomainWithoutTLD = url.domainToUnicode(domainWithoutTLD) || domainWithoutTLD;
+  const impersonatedBrand = brands.find(b =>
+    (domainWithoutTLD.includes(b) || decodedDomainWithoutTLD.includes(b)) &&
+    !hostname.startsWith(b + ".")
+  );
   if (impersonatedBrand) {
     findings.push({ severity: "high", label: `Brand impersonation (${impersonatedBrand})`, detail: `"${impersonatedBrand}" appears in the URL path but is not the actual domain. Classic phishing pattern.` });
     riskScore += 45;
