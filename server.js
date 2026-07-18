@@ -68,7 +68,6 @@ function analyzeURL(rawURL) {
     riskScore += 40;
   }
 
-
   const matchedTLD = suspiciousTLDs.find(tld => hostname.endsWith(tld));
   if (matchedTLD) {
     findings.push({ severity: "medium", label: `Suspicious TLD (${matchedTLD})`, detail: "This top-level domain is commonly associated with free/throwaway domains used in phishing campaigns." });
