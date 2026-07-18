@@ -25,6 +25,7 @@ npm run dev
 | Suspicious TLD (.tk, .xyz, .click…) | Medium   |
 | URL shortener (bit.ly, t.co…)       | Medium   |
 | Brand impersonation in subdomain    | High     |
+| Randomized domain names             | Medium   |
 | Unusually long URL (>200 chars)     | Low      |
 | Open redirect parameters            | Medium   |
 | Heavy URL encoding in path          | Low      |
