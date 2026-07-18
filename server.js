@@ -3,8 +3,11 @@ const fs   = require("fs");
 const path = require("path");
 const url  = require("url");
 
-const heuristics = JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics.json"), "utf8"));
-const { suspiciousTLDs, shorteners, brands, suspiciousParams } = heuristics;
+const loadHeuristic = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics", `${name}.json`), "utf8"));
+const suspiciousTLDs   = loadHeuristic("suspiciousTLDs");
+const shorteners       = loadHeuristic("shorteners");
+const brands           = loadHeuristic("brands");
+const suspiciousParams = loadHeuristic("suspiciousParams");
 
 const suspiciousParamsLower = new Set(suspiciousParams.map(p => p.toLowerCase()));
 
