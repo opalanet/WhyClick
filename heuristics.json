@@ -2,7 +2,12 @@
   "suspiciousTLDs": [
     ".tk", ".ml", ".ga", ".cf", ".gq",
     ".xyz", ".top", ".click", ".work",
-    ".loan", ".win", ".download", ".racing"
+    ".loan", ".win", ".download", ".racing",
+    ".bond", ".cfd", ".icu", ".sbs", ".xin",
+    ".vip", ".pro", ".live", ".cyou", ".lol",
+    ".world", ".shop", ".online", ".site", ".store",
+    ".club", ".info", ".mobi",
+    ".ru", ".cc", ".li"
   ],
   "shorteners": [
     "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
