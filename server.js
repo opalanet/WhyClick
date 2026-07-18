@@ -177,7 +177,7 @@ function analyzeURL(rawURL) {
 }
 
 const server = http.createServer((req, res) => {
-  const parsedReq = url.parse(req.url, true);
+  const parsedReq = new URL(req.url, "http://localhost");
   const pathname = parsedReq.pathname;
 
   const staticRoutes = {
