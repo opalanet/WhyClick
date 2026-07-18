@@ -7,7 +7,13 @@
   "shorteners": [
     "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
     "is.gd", "buff.ly", "adf.ly", "bl.ink", "short.link",
-    "rb.gy", "cutt.ly", "clck.ru"
+    "rb.gy", "cutt.ly", "clck.ru",
+    "t.ly", "tiny.cc", "v.gd", "x.co", "su.pr",
+    "lnkd.in", "amzn.to", "youtu.be", "fb.me", "wp.me",
+    "ift.tt", "dlvr.it", "zpr.io", "dub.sh", "go2l.ink",
+    "shorturl.at", "spoo.me", "tinu.be", "rip.to", "gg.gg",
+    "6url.ru", "migre.me", "bit.do", "snip.ly", "rebrand.ly",
+    "bl.ink", "bly.ink", "soo.gd", "tny.im", "ln.run"
   ],
   "brands": [
     "paypal", "google", "apple", "microsoft", "amazon",
