@@ -26,9 +26,9 @@ function checkIPHostname({ hostname }) {
 }
 
 function checkExcessiveSubdomains({ subdomainParts }) {
-  if (subdomainParts.length <= 4) return null;
+  if (subdomainParts.length <= 3) return null;
   return { severity: "medium", label: "Excessive subdomains", score: 20,
-    detail: `${subdomainParts.length} domain levels detected. Deep nesting is often used to spoof trusted brands.` };
+    detail: `${subdomainParts.length} domain levels detected. Deep nesting is often used to spoof trusted brands. (Note: multi-part TLDs like .co.uk or corporate subdomains may trigger this.)` };
 }
 
 function checkIDNHomograph({ hostname }) {
