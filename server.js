@@ -181,31 +181,17 @@ const server = http.createServer((req, res) => {
   const parsedReq = url.parse(req.url, true);
   const pathname = parsedReq.pathname;
 
-  if (req.method === "GET" && pathname === "/") {
-    const filePath = path.join(__dirname, "public", "index.html");
-    fs.readFile(filePath, (err, data) => {
-      if (err) { res.writeHead(500); return res.end("Internal error"); }
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(data);
-    });
-    return;
-  }
+  const staticRoutes = {
+    "/":          { file: "index.html",  type: "text/html" },
+    "/style.css": { file: "style.css",   type: "text/css" },
+    "/app.js":    { file: "app.js",      type: "application/javascript" },
+  };
 
-  if (req.method === "GET" && pathname === "/style.css") {
-    const filePath = path.join(__dirname, "public", "style.css");
-    fs.readFile(filePath, (err, data) => {
-      if (err) { res.writeHead(404); return res.end("Not found"); }
-      res.writeHead(200, { "Content-Type": "text/css" });
-      res.end(data);
-    });
-    return;
-  }
-
-  if (req.method === "GET" && pathname === "/app.js") {
-    const filePath = path.join(__dirname, "public", "app.js");
-    fs.readFile(filePath, (err, data) => {
-      if (err) { res.writeHead(404); return res.end("Not found"); }
-      res.writeHead(200, { "Content-Type": "application/javascript" });
+  if (req.method === "GET" && staticRoutes[pathname]) {
+    const { file, type } = staticRoutes[pathname];
+    fs.readFile(path.join(__dirname, "public", file), (err, data) => {
+      if (err) { res.writeHead(err.code === "ENOENT" ? 404 : 500); return res.end("Not found"); }
+      res.writeHead(200, { "Content-Type": type });
       res.end(data);
     });
     return;
