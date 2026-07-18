@@ -1,7 +1,7 @@
 const http = require("http");
-const fs = require("fs");
+const fs   = require("fs");
 const path = require("path");
-const url = require("url");
+const url  = require("url");
 
 const heuristics = JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics.json"), "utf8"));
 const { suspiciousTLDs, shorteners, brands, suspiciousParams } = heuristics;
