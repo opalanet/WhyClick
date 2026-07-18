@@ -91,6 +91,30 @@ function analyzeURL(rawURL) {
     riskScore += 45;
   }
 
+  const registeredDomain = subdomainParts.slice(-2, -1)[0] || "";
+  if (registeredDomain.length >= 6) {
+    const vowels = (registeredDomain.match(/[aeiou]/gi) || []).length;
+    const vowelRatio = vowels / registeredDomain.length;
+
+    const consonantClusters = (registeredDomain.match(/[^aeiou]{3,}/gi) || []).length;
+
+    const freq = {};
+    for (const c of registeredDomain) freq[c] = (freq[c] || 0) + 1;
+    const entropy = -Object.values(freq).reduce((sum, count) => {
+      const p = count / registeredDomain.length;
+      return sum + p * Math.log2(p);
+    }, 0);
+
+    if (vowelRatio < 0.2 || (consonantClusters >= 2 && entropy > 3.2)) {
+      findings.push({
+        severity: "medium",
+        label: "Randomly generated domain name",
+        detail: `"${registeredDomain}" has unusually low vowel density (${Math.round(vowelRatio * 100)}%) or high character entropy — a common trait of algorithmically generated phishing domains (e.g. .biz.id, .id scams).`,
+      });
+      riskScore += 25;
+    }
+  }
+
   if (fullURL.length > 200) {
     findings.push({ severity: "low", label: "Unusually long URL", detail: `${fullURL.length} characters. Long URLs can obscure the real destination or hide injected parameters.` });
     riskScore += 10;
