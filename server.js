@@ -1,7 +1,134 @@
-const http = require("http");
-const fs   = require("fs");
-const path = require("path");
-const url  = require("url");
+const http  = require("http");
+const https = require("https");
+const fs    = require("fs");
+const path  = require("path");
+const url   = require("url");
+
+function httpsGet(requestUrl, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(requestUrl, { headers: { "Accept": "application/json" } }, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        return httpsGet(res.headers.location, timeoutMs).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      let data = "";
+      res.on("data", chunk => (data += chunk));
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error("Invalid JSON")); }
+      });
+    });
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error("Timeout")); });
+    req.on("error", reject);
+  });
+}
+
+function formatDate(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  return isNaN(d) ? str : d.toISOString().split("T")[0];
+}
+
+function extractRdapField(obj, ...keys) {
+  for (const key of keys) {
+    if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+  }
+  return null;
+}
+
+function parseRdapEvents(events = []) {
+  const result = {};
+  for (const ev of events) {
+    const action = ev.eventAction;
+    const date   = formatDate(ev.eventDate);
+    if (action === "registration")   result.created  = date;
+    if (action === "expiration")     result.expires  = date;
+    if (action === "last changed")   result.updated  = date;
+  }
+  return result;
+}
+
+function parseRdapEntities(entities = []) {
+  const registrar = { name: null, email: null };
+  const registrant = { name: null, org: null, country: null };
+
+  for (const entity of entities) {
+    const roles = entity.roles || [];
+    const vcard = entity.vcardArray ? entity.vcardArray[1] : [];
+
+    const getName    = () => (vcard.find(f => f[0] === "fn")  || [])[3] || null;
+    const getEmail   = () => (vcard.find(f => f[0] === "email") || [])[3] || null;
+    const getOrg     = () => (vcard.find(f => f[0] === "org")   || [])[3] || null;
+    const getCountry = () => {
+      const adr = vcard.find(f => f[0] === "adr");
+      if (!adr) return null;
+      const parts = Array.isArray(adr[3]) ? adr[3] : [];
+      return parts[6] || null;
+    };
+
+    if (roles.includes("registrar")) {
+      registrar.name  = getName() || entity.publicIds?.[0]?.identifier || null;
+      registrar.email = getEmail();
+    }
+    if (roles.includes("registrant") || roles.includes("administrative")) {
+      registrant.name    = registrant.name    || getName();
+      registrant.org     = registrant.org     || getOrg();
+      registrant.country = registrant.country || getCountry();
+    }
+  }
+  return { registrar, registrant };
+}
+
+async function rdapLookup(hostname) {
+  const parts = hostname.split(".");
+  const domain = parts.length >= 2 ? parts.slice(-2).join(".") : hostname;
+
+  let rdapBase;
+  try {
+    const bootstrap = await httpsGet("https://data.iana.org/rdap/dns.json", 6000);
+    const tld = "." + parts[parts.length - 1];
+    const entry = bootstrap.services.find(([tlds]) => tlds.includes(tld.slice(1)));
+    rdapBase = entry ? entry[1][0] : null;
+  } catch {
+    rdapBase = "https://rdap.org/";
+  }
+
+  if (!rdapBase) rdapBase = "https://rdap.org/";
+  const rdapUrl = rdapBase.replace(/\/$/, "") + "/domain/" + domain;
+
+  const data = await httpsGet(rdapUrl, 6000);
+
+  const events = parseRdapEvents(data.events);
+  const { registrar, registrant } = parseRdapEntities(data.entities || []);
+
+  const nameservers = (data.nameservers || [])
+    .map(ns => (ns.ldhName || ns.unicodeName || "").toLowerCase())
+    .filter(Boolean);
+
+  const status = (data.status || []).map(s => s.toLowerCase());
+
+  let domainAgeDays = null;
+  if (events.created) {
+    domainAgeDays = Math.floor((Date.now() - new Date(events.created)) / 86400000);
+  }
+
+  return {
+    domain,
+    registrar:    registrar.name,
+    registrant:   registrant.org || registrant.name,
+    country:      registrant.country,
+    created:      events.created  || null,
+    updated:      events.updated  || null,
+    expires:      events.expires  || null,
+    domainAgeDays,
+    nameservers:  nameservers.slice(0, 4),
+    status,
+    rdapUrl,
+  };
+}
 
 const loadHeuristic = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics", `${name}.json`), "utf8"));
 const suspiciousTLDs   = loadHeuristic("suspiciousTLDs");
@@ -143,7 +270,7 @@ const CHECKS = [
   checkPathTraversal,
 ];
 
-function analyzeURL(rawURL) {
+async function analyzeURL(rawURL) {
   let inputURL = rawURL.trim();
   if (!/^https?:\/\//i.test(inputURL)) inputURL = "http://" + inputURL;
 
@@ -178,6 +305,24 @@ function analyzeURL(rawURL) {
     }
   }
 
+  let whois = null;
+  const isIPHostname = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || /^\[([0-9a-fA-F:]+)\]$/.test(hostname);
+  if (!isIPHostname && subdomainParts.length >= 2) {
+    try {
+      whois = await rdapLookup(hostname);
+      if (whois.domainAgeDays !== null && whois.domainAgeDays < 90) {
+        findings.push({
+          severity: "high",
+          label: `Newly registered domain (${whois.domainAgeDays} days old)`,
+          detail: "Domains under 90 days old are disproportionately used in phishing. Treat with extra caution.",
+        });
+        riskScore += 35;
+      }
+    } catch {
+      whois = { error: true };
+    }
+  }
+
   riskScore = Math.min(riskScore, 100);
 
   let verdict, verdictCode;
@@ -198,6 +343,7 @@ function analyzeURL(rawURL) {
     verdict,
     verdictCode,
     findings,
+    whois,
   };
 }
 
@@ -224,14 +370,14 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && pathname === "/api/analyze") {
     let body = "";
     req.on("data", chunk => (body += chunk));
-    req.on("end", () => {
+    req.on("end", async () => {
       try {
         const { url: targetURL } = JSON.parse(body);
         if (!targetURL || typeof targetURL !== "string") {
           res.writeHead(400, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ error: true, message: "No URL provided." }));
         }
-        const result = analyzeURL(targetURL);
+        const result = await analyzeURL(targetURL);
         res.writeHead(200, {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",

@@ -40,10 +40,9 @@ function render(data) {
   const frag = document.createDocumentFragment();
 
   frag.appendChild(makeVerdictBar(data));
-
   frag.appendChild(makeBreakdown(data.parsed));
-
   frag.appendChild(makeFindings(data.findings));
+  frag.appendChild(makeWhois(data.whois, data.parsed.hostname));
 
   output.appendChild(frag);
 
@@ -141,8 +140,87 @@ function makeFindings(findings) {
   return wrap;
 }
 
+function makeWhois(whois, hostname) {
+  const section = el("div", "whois-section");
+
+  const hdr = el("div", "section-header");
+  hdr.textContent = "whois / registration";
+  section.appendChild(hdr);
+
+  if (!whois) {
+    const skip = el("div", "whois-unavailable");
+    skip.textContent = "WHOIS lookup skipped (IP address or unsupported host).";
+    section.appendChild(skip);
+    return section;
+  }
+
+  if (whois.error) {
+    const err = el("div", "whois-unavailable");
+    err.textContent = "WHOIS data unavailable — registry did not respond or domain not found.";
+    section.appendChild(err);
+    return section;
+  }
+
+  const grid = el("div", "whois-grid");
+
+  if (whois.domainAgeDays !== null && whois.domainAgeDays !== undefined) {
+    const ageBadge = el("div", "whois-age-badge" + (whois.domainAgeDays < 90 ? " age-new" : whois.domainAgeDays < 365 ? " age-young" : " age-old"));
+    const ageYears = (whois.domainAgeDays / 365).toFixed(1);
+    ageBadge.textContent = whois.domainAgeDays < 365
+      ? `${whois.domainAgeDays}d old`
+      : `${ageYears}y old`;
+    ageBadge.title = `Registered: ${whois.created}`;
+    grid.appendChild(ageBadge);
+  }
+
+  const rows = [
+    ["domain",     whois.domain],
+    ["registrar",  whois.registrar],
+    ["registrant", whois.registrant],
+    ["country",    whois.country],
+    ["created",    whois.created],
+    ["updated",    whois.updated],
+    ["expires",    whois.expires],
+  ].filter(([, v]) => v);
+
+  rows.forEach(([k, v]) => {
+    const row = el("div", "whois-row");
+    const key = el("span", "whois-key"); key.textContent = k;
+    const val = el("span", "whois-val"); val.textContent = v;
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  });
+
+  if (whois.nameservers && whois.nameservers.length) {
+    const row = el("div", "whois-row whois-row-ns");
+    const key = el("span", "whois-key"); key.textContent = "nameservers";
+    const val = el("div", "whois-ns-list");
+    whois.nameservers.forEach(ns => {
+      const chip = el("span", "ns-chip");
+      chip.textContent = ns;
+      val.appendChild(chip);
+    });
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  }
+
+  if (whois.status && whois.status.length) {
+    const row = el("div", "whois-row");
+    const key = el("span", "whois-key"); key.textContent = "status";
+    const val = el("span", "whois-val whois-status"); val.textContent = whois.status.join(", ");
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
 function setLoading(on) {
-  btn.disabled   = on;
+  btn.disabled    = on;
   btn.textContent = on ? "analyzing..." : "analyze →";
 }
 
