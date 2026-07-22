@@ -44,6 +44,7 @@ function render(data) {
   frag.appendChild(makeFindings(data.findings));
   frag.appendChild(makeWhois(data.whois, data.parsed.hostname));
   frag.appendChild(makeCert(data.cert, data.parsed.protocol));
+  frag.appendChild(makeHeaders(data.headers));
 
   output.appendChild(frag);
 
@@ -300,6 +301,85 @@ function makeCert(cert, protocol) {
     row.appendChild(key);
     row.appendChild(val);
     grid.appendChild(row);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+function makeHeaders(headers) {
+  const section = el("div", "headers-section");
+
+  const hdr = el("div", "section-header");
+  hdr.textContent = "http headers / origin";
+  section.appendChild(hdr);
+
+  if (!headers) {
+    const skip = el("div", "headers-unavailable");
+    skip.textContent = "Headers probe skipped.";
+    section.appendChild(skip);
+    return section;
+  }
+
+  if (headers.error) {
+    const err = el("div", "headers-unavailable");
+    err.textContent = "Could not fetch headers — host unreachable or refused HEAD request.";
+    section.appendChild(err);
+    return section;
+  }
+
+  const grid = el("div", "headers-grid");
+
+  if (headers.detected && headers.detected.length) {
+    const badgeRow = el("div", "headers-badge-row");
+    headers.detected.forEach(d => {
+      const badge = el("span", `headers-platform-badge headers-kind-${d.kind}`);
+      badge.textContent = d.platform;
+      badge.title = `detected via: ${d.header}`;
+      badgeRow.appendChild(badge);
+    });
+    grid.appendChild(badgeRow);
+  }
+
+  const rows = [
+    ["status",       headers.statusCode ? String(headers.statusCode) : null],
+    ["server",       headers.serverDisplay || headers.serverRaw || null],
+    ["powered by",   headers.poweredByDisplay || headers.poweredByRaw || null],
+    ["content-type", headers.contentType || null],
+  ].filter(([, v]) => v);
+
+  rows.forEach(([k, v]) => {
+    const row = el("div", "headers-row");
+    const key = el("span", "headers-key"); key.textContent = k;
+    const val = el("span", "headers-val"); val.textContent = v;
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  });
+
+  if (headers.exposed && headers.exposed.length) {
+    const details = el("details", "headers-raw-details");
+    const summary = el("summary", "headers-raw-summary");
+    summary.textContent = `${headers.exposed.length} revealing header${headers.exposed.length > 1 ? "s" : ""} captured`;
+    details.appendChild(summary);
+
+    const table = el("div", "headers-raw-table");
+    headers.exposed.forEach(({ name, value }) => {
+      const row = el("div", "headers-raw-row");
+      const k = el("span", "headers-raw-key"); k.textContent = name;
+      const v = el("span", "headers-raw-val"); v.textContent = value;
+      row.appendChild(k);
+      row.appendChild(v);
+      table.appendChild(row);
+    });
+    details.appendChild(table);
+    grid.appendChild(details);
+  }
+
+  if (!rows.length && !(headers.detected && headers.detected.length)) {
+    const none = el("div", "headers-unavailable");
+    none.textContent = "No identifying headers returned by this server.";
+    grid.appendChild(none);
   }
 
   section.appendChild(grid);

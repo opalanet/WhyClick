@@ -197,6 +197,156 @@ function certLookup(hostname, port = 443, timeoutMs = 6000) {
   });
 }
 
+const HEADER_SIGNATURES = [
+  { key: "x-vercel-id",          platform: "Vercel",          kind: "hosting" },
+  { key: "x-vercel-cache",       platform: "Vercel",          kind: "hosting" },
+  { key: "x-netlify-id",         platform: "Netlify",         kind: "hosting" },
+  { key: "x-nf-request-id",      platform: "Netlify",         kind: "hosting" },
+  { key: "x-github-request-id",  platform: "GitHub Pages",    kind: "hosting" },
+  { key: "x-amz-cf-id",          platform: "AWS CloudFront",  kind: "cdn"     },
+  { key: "x-amz-rid",            platform: "AWS",             kind: "hosting" },
+  { key: "x-azure-ref",          platform: "Azure",           kind: "hosting" },
+  { key: "x-ms-routing-name",    platform: "Azure",           kind: "hosting" },
+  { key: "x-firebase-appcheck",  platform: "Firebase",        kind: "hosting" },
+  { key: "x-render-origin-server", platform: "Render",        kind: "hosting" },
+  { key: "fly-request-id",       platform: "Fly.io",          kind: "hosting" },
+  { key: "x-railway-request-id", platform: "Railway",         kind: "hosting" },
+  { key: "x-heroku-queue-depth", platform: "Heroku",          kind: "hosting" },
+  { key: "cf-ray",               platform: "Cloudflare",      kind: "cdn"     },
+  { key: "cf-cache-status",      platform: "Cloudflare",      kind: "cdn"     },
+  { key: "x-fastly-request-id",  platform: "Fastly",          kind: "cdn"     },
+  { key: "x-akamai-request-id",  platform: "Akamai",          kind: "cdn"     },
+  { key: "x-amzn-requestid",     platform: "AWS API Gateway", kind: "cdn"     },
+  { key: "x-sucuri-id",          platform: "Sucuri WAF",      kind: "cdn"     },
+  { key: "x-bunny-cache",        platform: "BunnyCDN",        kind: "cdn"     },
+];
+
+const SERVER_MAP = [
+  [/nginx/i,       "Nginx"],
+  [/apache/i,      "Apache"],
+  [/cloudflare/i,  "Cloudflare"],
+  [/openresty/i,   "OpenResty (Nginx)"],
+  [/microsoft-iis/i, "Microsoft IIS"],
+  [/gunicorn/i,    "Gunicorn"],
+  [/caddy/i,       "Caddy"],
+  [/lighttpd/i,    "Lighttpd"],
+  [/litespeed/i,   "LiteSpeed"],
+  [/cowboy/i,      "Cowboy (Erlang)"],
+  [/envoy/i,       "Envoy"],
+  [/traefik/i,     "Traefik"],
+  [/fasthttp/i,    "FastHTTP"],
+  [/kestrel/i,     "Kestrel (.NET)"],
+  [/vercel/i,      "Vercel"],
+  [/netlify/i,     "Netlify"],
+  [/render/i,      "Render"],
+];
+
+const POWERED_BY_MAP = [
+  [/php/i,         "PHP"],
+  [/asp\.net/i,    "ASP.NET"],
+  [/express/i,     "Express (Node.js)"],
+  [/next\.js/i,    "Next.js"],
+  [/rails/i,       "Ruby on Rails"],
+  [/django/i,      "Django"],
+  [/wordpress/i,   "WordPress"],
+  [/drupal/i,      "Drupal"],
+  [/joomla/i,      "Joomla"],
+  [/shopify/i,     "Shopify"],
+  [/wix/i,         "Wix"],
+  [/squarespace/i, "Squarespace"],
+  [/ghost/i,       "Ghost"],
+  [/laravel/i,     "Laravel"],
+];
+
+function headersLookup(targetUrl, timeoutMs = 6000) {
+  return new Promise((resolve, reject) => {
+    let inputUrl = targetUrl.trim();
+    if (!/^https?:\/\//i.test(inputUrl)) inputUrl = "https://" + inputUrl;
+
+    let parsed;
+    try { parsed = new URL(inputUrl); }
+    catch { return reject(new Error("Invalid URL")); }
+
+    const isHttps = parsed.protocol === "https:";
+    const mod = isHttps ? https : http;
+    const port = parsed.port
+      ? parseInt(parsed.port, 10)
+      : (isHttps ? 443 : 80);
+
+    const options = {
+      hostname: parsed.hostname,
+      port,
+      path: parsed.pathname + parsed.search,
+      method: "HEAD",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; WhyClick/1.0; +https://github.com/whyclick)",
+        "Accept": "text/html,application/xhtml+xml,*/*",
+      },
+      rejectUnauthorized: false,
+    };
+
+    const req = mod.request(options, (res) => {
+      res.resume();
+
+      const raw = res.headers;
+      const h = (name) => (raw[name] || "").toString().trim();
+
+      const serverRaw = h("server");
+      let serverDisplay = null;
+      if (serverRaw) {
+        const match = SERVER_MAP.find(([re]) => re.test(serverRaw));
+        serverDisplay = match ? match[1] : serverRaw.split("/")[0];
+      }
+
+      const poweredByRaw = h("x-powered-by") || h("via");
+      let poweredByDisplay = null;
+      if (poweredByRaw) {
+        const match = POWERED_BY_MAP.find(([re]) => re.test(poweredByRaw));
+        poweredByDisplay = match ? match[1] : poweredByRaw.split("/")[0];
+      }
+
+      const detected = [];
+      for (const sig of HEADER_SIGNATURES) {
+        if (raw[sig.key] !== undefined) {
+          if (!detected.find(d => d.platform === sig.platform)) {
+            detected.push({ platform: sig.platform, kind: sig.kind, header: sig.key });
+          }
+        }
+      }
+
+      const location = h("location") || null;
+
+      const contentType = h("content-type").split(";")[0].trim() || null;
+
+      const exposed = [];
+      if (serverRaw)      exposed.push({ name: "server",        value: serverRaw });
+      if (poweredByRaw)   exposed.push({ name: "x-powered-by",  value: poweredByRaw });
+      for (const sig of HEADER_SIGNATURES) {
+        const v = raw[sig.key];
+        if (v !== undefined) {
+          exposed.push({ name: sig.key, value: v.toString().slice(0, 80) });
+        }
+      }
+
+      resolve({
+        statusCode:      res.statusCode,
+        serverRaw,
+        serverDisplay,
+        poweredByRaw,
+        poweredByDisplay,
+        detected,
+        location,
+        contentType,
+        exposed: exposed.slice(0, 12),
+      });
+    });
+
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error("Timeout")); });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 const loadHeuristic = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics", `${name}.json`), "utf8"));
 const suspiciousTLDs   = loadHeuristic("suspiciousTLDs");
 const shorteners       = loadHeuristic("shorteners");
@@ -390,6 +540,15 @@ async function analyzeURL(rawURL) {
     }
   }
 
+  let headers = null;
+  const headersPromise = (async () => {
+    try {
+      headers = await headersLookup(inputURL);
+    } catch {
+      headers = { error: true };
+    }
+  })();
+
   let cert = null;
   const isHTTPS = parsed.protocol === "https:";
   if (isHTTPS && !isIPHostname) {
@@ -435,6 +594,8 @@ async function analyzeURL(rawURL) {
     }
   }
 
+  await headersPromise;
+
   riskScore = Math.min(riskScore, 100);
 
   let verdict, verdictCode;
@@ -457,6 +618,7 @@ async function analyzeURL(rawURL) {
     findings,
     whois,
     cert,
+    headers,
   };
 }
 
