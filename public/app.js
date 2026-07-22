@@ -341,6 +341,36 @@ function makeHeaders(headers) {
     grid.appendChild(badgeRow);
   }
 
+  if (headers.redirectChain && headers.redirectChain.length) {
+    const chainWrap = el("div", "redirect-chain");
+
+    const chainLabel = el("div", "redirect-chain-label");
+    chainLabel.textContent = `redirects (${headers.redirectChain.length} hop${headers.redirectChain.length > 1 ? "s" : ""})`;
+    chainWrap.appendChild(chainLabel);
+
+    headers.redirectChain.forEach((hop, i) => {
+      const row = el("div", "redirect-hop");
+
+      const pill = el("span", `redirect-status redirect-status-${statusClass(hop.statusCode)}`);
+      pill.textContent = hop.error ? "ERR" : (hop.statusCode || "?");
+      row.appendChild(pill);
+
+      const url = el("span", "redirect-url");
+      url.textContent = hop.url;
+      row.appendChild(url);
+
+      chainWrap.appendChild(row);
+
+      if (i < headers.redirectChain.length - 1) {
+        const arrow = el("div", "redirect-arrow");
+        arrow.textContent = "↓";
+        chainWrap.appendChild(arrow);
+      }
+    });
+
+    grid.appendChild(chainWrap);
+  }
+
   const rows = [
     ["status",       headers.statusCode ? String(headers.statusCode) : null],
     ["server",       headers.serverDisplay || headers.serverRaw || null],
@@ -384,6 +414,14 @@ function makeHeaders(headers) {
 
   section.appendChild(grid);
   return section;
+}
+
+function statusClass(code) {
+  if (!code) return "unknown";
+  if (code >= 200 && code < 300) return "ok";
+  if (code >= 300 && code < 400) return "redirect";
+  if (code >= 400) return "error";
+  return "unknown";
 }
 
 function setLoading(on) {

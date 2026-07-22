@@ -258,20 +258,15 @@ const POWERED_BY_MAP = [
   [/laravel/i,     "Laravel"],
 ];
 
-function headersLookup(targetUrl, timeoutMs = 6000) {
+function headRequest(targetUrl, timeoutMs = 6000) {
   return new Promise((resolve, reject) => {
-    let inputUrl = targetUrl.trim();
-    if (!/^https?:\/\//i.test(inputUrl)) inputUrl = "https://" + inputUrl;
-
     let parsed;
-    try { parsed = new URL(inputUrl); }
+    try { parsed = new URL(targetUrl); }
     catch { return reject(new Error("Invalid URL")); }
 
     const isHttps = parsed.protocol === "https:";
     const mod = isHttps ? https : http;
-    const port = parsed.port
-      ? parseInt(parsed.port, 10)
-      : (isHttps ? 443 : 80);
+    const port = parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80);
 
     const options = {
       hostname: parsed.hostname,
@@ -287,64 +282,109 @@ function headersLookup(targetUrl, timeoutMs = 6000) {
 
     const req = mod.request(options, (res) => {
       res.resume();
-
-      const raw = res.headers;
-      const h = (name) => (raw[name] || "").toString().trim();
-
-      const serverRaw = h("server");
-      let serverDisplay = null;
-      if (serverRaw) {
-        const match = SERVER_MAP.find(([re]) => re.test(serverRaw));
-        serverDisplay = match ? match[1] : serverRaw.split("/")[0];
-      }
-
-      const poweredByRaw = h("x-powered-by") || h("via");
-      let poweredByDisplay = null;
-      if (poweredByRaw) {
-        const match = POWERED_BY_MAP.find(([re]) => re.test(poweredByRaw));
-        poweredByDisplay = match ? match[1] : poweredByRaw.split("/")[0];
-      }
-
-      const detected = [];
-      for (const sig of HEADER_SIGNATURES) {
-        if (raw[sig.key] !== undefined) {
-          if (!detected.find(d => d.platform === sig.platform)) {
-            detected.push({ platform: sig.platform, kind: sig.kind, header: sig.key });
-          }
-        }
-      }
-
-      const location = h("location") || null;
-
-      const contentType = h("content-type").split(";")[0].trim() || null;
-
-      const exposed = [];
-      if (serverRaw)      exposed.push({ name: "server",        value: serverRaw });
-      if (poweredByRaw)   exposed.push({ name: "x-powered-by",  value: poweredByRaw });
-      for (const sig of HEADER_SIGNATURES) {
-        const v = raw[sig.key];
-        if (v !== undefined) {
-          exposed.push({ name: sig.key, value: v.toString().slice(0, 80) });
-        }
-      }
-
-      resolve({
-        statusCode:      res.statusCode,
-        serverRaw,
-        serverDisplay,
-        poweredByRaw,
-        poweredByDisplay,
-        detected,
-        location,
-        contentType,
-        exposed: exposed.slice(0, 12),
-      });
+      resolve({ statusCode: res.statusCode, headers: res.headers, url: targetUrl });
     });
 
     req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error("Timeout")); });
     req.on("error", reject);
     req.end();
   });
+}
+
+function resolveLocation(location, currentUrl) {
+  try {
+    return new URL(location, currentUrl).href;
+  } catch {
+    return location;
+  }
+}
+
+async function headersLookup(targetUrl, timeoutMs = 6000) {
+  let inputUrl = targetUrl.trim();
+  if (!/^https?:\/\//i.test(inputUrl)) inputUrl = "https://" + inputUrl;
+  const redirectChain = [];
+  let currentUrl = inputUrl;
+  const MAX_HOPS = 8;
+  let finalRes = null;
+
+  for (let hop = 0; hop <= MAX_HOPS; hop++) {
+    let res;
+    try {
+      res = await headRequest(currentUrl, timeoutMs);
+    } catch (err) {
+      redirectChain.push({ url: currentUrl, statusCode: null, error: err.message });
+      break;
+    }
+
+    const isRedirect = res.statusCode >= 300 && res.statusCode < 400;
+    const locationRaw = (res.headers["location"] || "").toString().trim();
+
+    if (isRedirect && locationRaw) {
+      redirectChain.push({ url: currentUrl, statusCode: res.statusCode, to: resolveLocation(locationRaw, currentUrl) });
+      currentUrl = resolveLocation(locationRaw, currentUrl);
+    } else {
+      redirectChain.push({ url: currentUrl, statusCode: res.statusCode });
+      finalRes = res;
+      break;
+    }
+  }
+
+  if (!finalRes && redirectChain.length > 0 && !redirectChain[redirectChain.length - 1].error) {
+    redirectChain[redirectChain.length - 1].tooManyRedirects = true;
+  }
+
+  const raw = finalRes ? finalRes.headers : {};
+  const h = (name) => (raw[name] || "").toString().trim();
+
+  const serverRaw = h("server");
+  let serverDisplay = null;
+  if (serverRaw) {
+    const match = SERVER_MAP.find(([re]) => re.test(serverRaw));
+    serverDisplay = match ? match[1] : serverRaw.split("/")[0];
+  }
+
+  const poweredByRaw = h("x-powered-by") || h("via");
+  let poweredByDisplay = null;
+  if (poweredByRaw) {
+    const match = POWERED_BY_MAP.find(([re]) => re.test(poweredByRaw));
+    poweredByDisplay = match ? match[1] : poweredByRaw.split("/")[0];
+  }
+
+  const detected = [];
+  for (const sig of HEADER_SIGNATURES) {
+    if (raw[sig.key] !== undefined) {
+      if (!detected.find(d => d.platform === sig.platform)) {
+        detected.push({ platform: sig.platform, kind: sig.kind, header: sig.key });
+      }
+    }
+  }
+
+  const contentType = h("content-type").split(";")[0].trim() || null;
+
+  const exposed = [];
+  if (serverRaw)    exposed.push({ name: "server",       value: serverRaw });
+  if (poweredByRaw) exposed.push({ name: "x-powered-by", value: poweredByRaw });
+  for (const sig of HEADER_SIGNATURES) {
+    const v = raw[sig.key];
+    if (v !== undefined) {
+      exposed.push({ name: sig.key, value: v.toString().slice(0, 80) });
+    }
+  }
+
+  const finalHop   = redirectChain[redirectChain.length - 1];
+  const statusCode = finalHop ? finalHop.statusCode : null;
+
+  return {
+    statusCode,
+    serverRaw,
+    serverDisplay,
+    poweredByRaw,
+    poweredByDisplay,
+    detected,
+    contentType,
+    exposed: exposed.slice(0, 12),
+    redirectChain: redirectChain.length > 1 ? redirectChain : [],
+  };
 }
 
 const loadHeuristic = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics", `${name}.json`), "utf8"));

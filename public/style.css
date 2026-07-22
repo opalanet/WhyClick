@@ -587,6 +587,73 @@ footer {
   word-break: break-all;
 }
 
+.redirect-chain {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.redirect-chain-label {
+  font-size: 0.70rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.redirect-hop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.redirect-status {
+  font-size: 0.70rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.redirect-status-redirect {
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--amber);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+}
+
+.redirect-status-ok {
+  background: rgba(61, 204, 112, 0.10);
+  color: var(--green);
+  border: 1px solid rgba(61, 204, 112, 0.3);
+}
+
+.redirect-status-error {
+  background: rgba(232, 64, 64, 0.12);
+  color: var(--red);
+  border: 1px solid rgba(232, 64, 64, 0.3);
+}
+
+.redirect-status-unknown {
+  background: rgba(255,255,255,0.05);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.redirect-url {
+  font-size: 0.75rem;
+  color: var(--text);
+  word-break: break-all;
+  opacity: 0.85;
+}
+
+.redirect-arrow {
+  font-size: 0.70rem;
+  color: var(--muted);
+  padding-left: 6px;
+  line-height: 1.8;
+}
+
 @media (max-width: 540px) {
   .headers-raw-row { grid-template-columns: 1fr; gap: 2px; }
   .headers-row     { grid-template-columns: 1fr; }
