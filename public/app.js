@@ -43,6 +43,7 @@ function render(data) {
   frag.appendChild(makeBreakdown(data.parsed));
   frag.appendChild(makeFindings(data.findings));
   frag.appendChild(makeWhois(data.whois, data.parsed.hostname));
+  frag.appendChild(makeCert(data.cert, data.parsed.protocol));
 
   output.appendChild(frag);
 
@@ -210,6 +211,92 @@ function makeWhois(whois, hostname) {
     const row = el("div", "whois-row");
     const key = el("span", "whois-key"); key.textContent = "status";
     const val = el("span", "whois-val whois-status"); val.textContent = whois.status.join(", ");
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+function makeCert(cert, protocol) {
+  const section = el("div", "cert-section");
+
+  const hdr = el("div", "section-header");
+  hdr.textContent = "tls certificate";
+  section.appendChild(hdr);
+
+  if (protocol !== "https:") {
+    const skip = el("div", "cert-unavailable");
+    skip.textContent = "Certificate check skipped — URL does not use HTTPS.";
+    section.appendChild(skip);
+    return section;
+  }
+
+  if (!cert) {
+    const skip = el("div", "cert-unavailable");
+    skip.textContent = "Certificate check skipped.";
+    section.appendChild(skip);
+    return section;
+  }
+
+  if (cert.error) {
+    const err = el("div", "cert-unavailable");
+    err.textContent = "Certificate data unavailable — could not connect to host.";
+    section.appendChild(err);
+    return section;
+  }
+
+  const grid = el("div", "cert-grid");
+
+  if (cert.isSelfSigned) {
+    const badge = el("div", "cert-badge cert-badge-danger");
+    badge.textContent = "self-signed";
+    grid.appendChild(badge);
+  } else if (!cert.hostnameMatches) {
+    const badge = el("div", "cert-badge cert-badge-danger");
+    badge.textContent = "hostname mismatch";
+    grid.appendChild(badge);
+  } else if (cert.isExpired) {
+    const badge = el("div", "cert-badge cert-badge-danger");
+    badge.textContent = "expired";
+    grid.appendChild(badge);
+  } else if (cert.isExpiringSoon) {
+    const badge = el("div", "cert-badge cert-badge-warn");
+    badge.textContent = `expires in ${cert.daysLeft}d`;
+    grid.appendChild(badge);
+  } else {
+    const badge = el("div", "cert-badge cert-badge-ok");
+    badge.textContent = "valid";
+    grid.appendChild(badge);
+  }
+
+  const rows = [
+    ["issuer",     cert.issuerOrg || cert.issuerCN],
+    ["issued to",  cert.subjectCN],
+    ["valid from", cert.validFrom],
+    ["valid to",   cert.validTo],
+  ].filter(([, v]) => v);
+
+  rows.forEach(([k, v]) => {
+    const row = el("div", "cert-row");
+    const key = el("span", "cert-key"); key.textContent = k;
+    const val = el("span", "cert-val"); val.textContent = v;
+    row.appendChild(key);
+    row.appendChild(val);
+    grid.appendChild(row);
+  });
+
+  if (cert.sans && cert.sans.length) {
+    const row = el("div", "cert-row cert-row-sans");
+    const key = el("span", "cert-key"); key.textContent = "covers";
+    const val = el("div", "cert-sans-list");
+    cert.sans.forEach(san => {
+      const chip = el("span", "cert-san-chip");
+      chip.textContent = san;
+      val.appendChild(chip);
+    });
     row.appendChild(key);
     row.appendChild(val);
     grid.appendChild(row);

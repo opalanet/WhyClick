@@ -361,3 +361,99 @@ footer {
   color: var(--fg, #e0e0e0);
   word-break: break-all;
 }
+
+.cert-section {
+  margin-top: 24px;
+}
+
+.cert-unavailable {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 10px 0 4px;
+  font-style: italic;
+}
+
+.cert-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.cert-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  width: fit-content;
+  text-transform: uppercase;
+}
+
+.cert-badge-ok {
+  background: rgba(61, 204, 112, 0.1);
+  color: var(--green);
+  border: 1px solid rgba(61, 204, 112, 0.3);
+}
+
+.cert-badge-warn {
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--amber);
+  border: 1px solid rgba(245, 166, 35, 0.3);
+}
+
+.cert-badge-danger {
+  background: rgba(232, 64, 64, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(232, 64, 64, 0.35);
+}
+
+.cert-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.cert-row:last-child {
+  border-bottom: none;
+}
+
+.cert-row-sans {
+  align-items: flex-start;
+}
+
+.cert-key {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.cert-val {
+  font-size: 0.82rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.cert-sans-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cert-san-chip {
+  font-size: 0.72rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 2px 8px;
+  border-radius: 2px;
+  color: var(--text);
+  word-break: break-all;
+}

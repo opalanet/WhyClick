@@ -1,5 +1,6 @@
 const http  = require("http");
 const https = require("https");
+const tls   = require("tls");
 const fs    = require("fs");
 const path  = require("path");
 const url   = require("url");
@@ -128,6 +129,72 @@ async function rdapLookup(hostname) {
     status,
     rdapUrl,
   };
+}
+
+function certLookup(hostname, port = 443, timeoutMs = 6000) {
+  return new Promise((resolve, reject) => {
+    const socket = tls.connect(
+      { host: hostname, port, servername: hostname, rejectUnauthorized: false },
+      () => {
+        const cert = socket.getPeerCertificate(true);
+        const authorized = socket.authorized;
+        const authError  = socket.authorizationError || null;
+        socket.destroy();
+
+        if (!cert || !cert.subject) {
+          return reject(new Error("No certificate returned"));
+        }
+
+        const issuerOrg   = cert.issuer?.O   || cert.issuer?.CN || null;
+        const issuerCN    = cert.issuer?.CN   || null;
+        const subjectCN   = cert.subject?.CN  || null;
+        const subjectAlt  = cert.subjectaltname || null;
+        const validFrom   = cert.valid_from ? new Date(cert.valid_from).toISOString().split("T")[0] : null;
+        const validTo     = cert.valid_to   ? new Date(cert.valid_to).toISOString().split("T")[0]   : null;
+
+        const now         = Date.now();
+        const expiry      = cert.valid_to ? new Date(cert.valid_to).getTime() : null;
+        const isExpired   = expiry !== null && expiry < now;
+        const daysLeft    = expiry !== null ? Math.floor((expiry - now) / 86400000) : null;
+        const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 14;
+
+        const isSelfSigned = cert.issuer &&
+          cert.subject &&
+          JSON.stringify(cert.issuer) === JSON.stringify(cert.subject);
+
+        const sans = subjectAlt
+          ? subjectAlt.split(",").map(s => s.replace(/^DNS:/, "").trim()).filter(Boolean)
+          : [];
+
+        const hostnameMatches = authorized || (() => {
+          const wild = sans.some(san => {
+            if (san.startsWith("*.")) return hostname.endsWith(san.slice(1));
+            return san === hostname;
+          });
+          return wild || (subjectCN && (subjectCN === hostname || (subjectCN.startsWith("*.") && hostname.endsWith(subjectCN.slice(1)))));
+        })();
+
+        resolve({
+          issuerOrg,
+          issuerCN,
+          subjectCN,
+          validFrom,
+          validTo,
+          daysLeft,
+          isExpired,
+          isExpiringSoon,
+          isSelfSigned,
+          hostnameMatches,
+          authorized,
+          authError,
+          sans: sans.slice(0, 6),
+        });
+      }
+    );
+
+    socket.setTimeout(timeoutMs, () => { socket.destroy(); reject(new Error("Timeout")); });
+    socket.on("error", reject);
+  });
 }
 
 const loadHeuristic = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, "heuristics", `${name}.json`), "utf8"));
@@ -323,6 +390,51 @@ async function analyzeURL(rawURL) {
     }
   }
 
+  let cert = null;
+  const isHTTPS = parsed.protocol === "https:";
+  if (isHTTPS && !isIPHostname) {
+    try {
+      const port = parsed.port ? parseInt(parsed.port, 10) : 443;
+      cert = await certLookup(hostname, port);
+
+      if (cert.isSelfSigned) {
+        findings.push({
+          severity: "high",
+          label: "Self-signed certificate",
+          detail: "The certificate was not issued by a trusted authority. Anyone can create one — it provides no proof of identity.",
+        });
+        riskScore += 35;
+      }
+
+      if (cert.isExpired) {
+        findings.push({
+          severity: "high",
+          label: "Expired TLS certificate",
+          detail: `Certificate expired on ${cert.validTo}. Legitimate sites keep their certs current; an expired cert is a red flag.`,
+        });
+        riskScore += 30;
+      } else if (cert.isExpiringSoon) {
+        findings.push({
+          severity: "medium",
+          label: `Certificate expiring soon (${cert.daysLeft} days)`,
+          detail: `The TLS certificate expires on ${cert.validTo}. This may indicate poor maintenance — or an abandoned site.`,
+        });
+        riskScore += 10;
+      }
+
+      if (!cert.hostnameMatches && !cert.isSelfSigned) {
+        findings.push({
+          severity: "high",
+          label: "Certificate hostname mismatch",
+          detail: `The certificate was not issued for "${hostname}". This could mean traffic is being intercepted or the domain was recently moved.`,
+        });
+        riskScore += 30;
+      }
+    } catch {
+      cert = { error: true };
+    }
+  }
+
   riskScore = Math.min(riskScore, 100);
 
   let verdict, verdictCode;
@@ -344,6 +456,7 @@ async function analyzeURL(rawURL) {
     verdictCode,
     findings,
     whois,
+    cert,
   };
 }
 
