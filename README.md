@@ -32,6 +32,21 @@ npm run dev
 | Non-standard port                   | Medium   |
 | @ symbol (credential spoofing)      | High     |
 | Path traversal patterns             | Medium   |
+| Newly registered domain (<90 days)  | High     |
+
+### WHOIS / RDAP lookup
+
+Each analysis also performs a live domain registration lookup using the [RDAP protocol](https://about.rdap.org/) — the modern, JSON-based successor to WHOIS. The server queries the IANA bootstrap registry to find the authoritative RDAP endpoint for each TLD, then fetches:
+
+- Registrar name
+- Registrant organisation / name and country
+- Registration, last-updated, and expiry dates
+- Nameservers
+- Domain status flags
+
+Domain age is surfaced as a colour-coded badge (red < 90 days, amber < 1 year, green otherwise). Domains under 90 days old are also added as a High-severity finding, as newly registered domains are disproportionately used in phishing campaigns.
+
+WHOIS data is fetched at analysis time and never cached. If the registry does not respond within 5 seconds, the lookup is skipped silently and the rest of the analysis still completes.
 
 ## Risk score
 
