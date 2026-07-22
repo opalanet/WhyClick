@@ -40,7 +40,7 @@ npm run dev
 
 ### WHOIS / RDAP lookup
 
-Each analysis also performs a live domain registration lookup using the [RDAP protocol](https://about.rdap.org/) — the modern, JSON-based successor to WHOIS. The server queries the IANA bootstrap registry to find the authoritative RDAP endpoint for each TLD, then fetches:
+Each analysis performs a live domain registration lookup using the [RDAP protocol](https://about.rdap.org/) — the modern, JSON-based successor to WHOIS. The server queries the IANA bootstrap registry to find the authoritative RDAP endpoint for each TLD, then fetches:
 
 - Registrar name
 - Registrant organisation / name and country
@@ -48,7 +48,7 @@ Each analysis also performs a live domain registration lookup using the [RDAP pr
 - Nameservers
 - Domain status flags
 
-Domain age is surfaced as a colour-coded badge (red < 90 days, amber < 1 year, green otherwise). Domains under 90 days old are also added as a High-severity finding, as newly registered domains are disproportionately used in phishing campaigns.
+Domain age is surfaced as a colour-coded badge (red < 90 days, amber < 1 year, green otherwise). Domains under 90 days old are also raised as a High-severity finding, as newly registered domains are disproportionately used in phishing campaigns.
 
 WHOIS data is fetched at analysis time and never cached. If the registry does not respond within 5 seconds, the lookup is skipped silently and the rest of the analysis still completes.
 
@@ -73,6 +73,35 @@ Four conditions are also raised as findings and contribute to the risk score:
 A colour-coded badge summarises the overall cert status at a glance: **valid** (green), **expires in N days** (amber), **expired** / **self-signed** / **hostname mismatch** (red).
 
 Certificate inspection is skipped for plain `http:` URLs and non-hostname targets (raw IP addresses). If the TLS handshake times out or fails, the section reports unavailability and the rest of the analysis still completes.
+
+### HTTP headers / origin detection
+
+WhyClick fires a `HEAD` request to the target URL and inspects the response headers to identify the server software, hosting platform, and CDN in use — information that is often unintentionally exposed and useful for understanding where a site actually lives.
+
+**Platform and CDN detection** works by recognising telltale headers that specific providers inject into every response:
+
+| Header                  | Platform          | Kind    |
+|-------------------------|-------------------|---------|
+| `cf-ray`                | Cloudflare        | CDN     |
+| `x-vercel-id`           | Vercel            | Hosting |
+| `x-nf-request-id`       | Netlify           | Hosting |
+| `x-github-request-id`   | GitHub Pages      | Hosting |
+| `x-amz-cf-id`           | AWS CloudFront    | CDN     |
+| `x-azure-ref`           | Azure             | Hosting |
+| `fly-request-id`        | Fly.io            | Hosting |
+| `x-fastly-request-id`   | Fastly            | CDN     |
+| `x-sucuri-id`           | Sucuri WAF        | CDN     |
+| *(+ 16 more)*           |                   |         |
+
+Detected platforms are shown as colour-coded badges — blue for hosting providers, amber for CDN/proxy layers.
+
+**Server software** is read from the `server` header and normalised to a clean display name (Nginx, Apache, Caddy, LiteSpeed, Microsoft IIS, Kestrel, etc.) with version numbers stripped.
+
+**Runtime / framework** is read from `x-powered-by` and `via`, covering PHP, ASP.NET, Express, Next.js, Django, Ruby on Rails, WordPress, Shopify, and others.
+
+All captured headers are also listed in a collapsible **revealing headers** section showing the raw header name and value, so it is clear exactly which header triggered each detection.
+
+The headers probe runs in parallel with the TLS certificate check and does not add to the overall analysis time. If the host refuses `HEAD` requests or is unreachable, the section reports unavailability and the rest of the analysis still completes.
 
 ## Risk score
 
