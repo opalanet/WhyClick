@@ -33,6 +33,10 @@ npm run dev
 | @ symbol (credential spoofing)      | High     |
 | Path traversal patterns             | Medium   |
 | Newly registered domain (<90 days)  | High     |
+| Self-signed certificate             | High     |
+| Expired TLS certificate             | High     |
+| Certificate hostname mismatch       | High     |
+| Certificate expiring within 14 days | Medium   |
 
 ### WHOIS / RDAP lookup
 
@@ -47,6 +51,28 @@ Each analysis also performs a live domain registration lookup using the [RDAP pr
 Domain age is surfaced as a colour-coded badge (red < 90 days, amber < 1 year, green otherwise). Domains under 90 days old are also added as a High-severity finding, as newly registered domains are disproportionately used in phishing campaigns.
 
 WHOIS data is fetched at analysis time and never cached. If the registry does not respond within 5 seconds, the lookup is skipped silently and the rest of the analysis still completes.
+
+### TLS certificate analysis
+
+For `https:` URLs, WhyClick opens a TLS connection to the host and inspects the server certificate. The following are surfaced in a dedicated **tls certificate** section:
+
+- Issuer organisation and common name
+- Subject common name
+- Validity window (valid from / valid to)
+- Subject Alternative Names (SANs) covered by the certificate
+
+Four conditions are also raised as findings and contribute to the risk score:
+
+| Condition                        | Severity | Score |
+|----------------------------------|----------|-------|
+| Self-signed certificate          | High     | +35   |
+| Expired certificate              | High     | +30   |
+| Hostname not covered by cert     | High     | +30   |
+| Expiring within 14 days          | Medium   | +10   |
+
+A colour-coded badge summarises the overall cert status at a glance: **valid** (green), **expires in N days** (amber), **expired** / **self-signed** / **hostname mismatch** (red).
+
+Certificate inspection is skipped for plain `http:` URLs and non-hostname targets (raw IP addresses). If the TLS handshake times out or fails, the section reports unavailability and the rest of the analysis still completes.
 
 ## Risk score
 
