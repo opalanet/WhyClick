@@ -101,6 +101,8 @@ Detected platforms are shown as colour-coded badges — blue for hosting provide
 
 All captured headers are also listed in a collapsible **revealing headers** section showing the raw header name and value, so it is clear exactly which header triggered each detection.
 
+**Redirect chain tracking** follows up to 8 hops manually, recording each intermediate URL and its status code. The full chain is displayed in order — for example, `301 http://example.com → 302 https://example.com → 200 https://www.example.com` — so it is immediately clear whether a URL silently bounces through multiple domains before landing. Relative `Location` headers are resolved against the current base URL at each hop.
+
 The headers probe runs in parallel with the TLS certificate check and does not add to the overall analysis time. If the host refuses `HEAD` requests or is unreachable, the section reports unavailability and the rest of the analysis still completes.
 
 ## Risk score
